@@ -228,6 +228,8 @@ func SJFSchedule(w io.Writer, title string, processes []Process) {
         gantt       = make([]TimeSlice, 0)
 		waitingTimes = make([]int64, len(processes))
 		completions = make([]int64, len(processes))
+		lastStart int64
+		done = make([]bool, len(processes))
     )
 
 	remainingBursts := make([]int64, len(processes))
@@ -246,6 +248,23 @@ func SJFSchedule(w io.Writer, title string, processes []Process) {
 				shortest = i
 				check = true
 			}
+		}
+		if start != 0 {
+			if lastId != shortest && !done[lastId] {
+				if lastId != -1 {
+					gantt = append(gantt, TimeSlice{
+						PID:   processes[lastId].ProcessID,
+						Start: lastStart,
+						Stop:  serviceTime,
+					})
+					lastStart = start
+				}
+				lastId = shortest
+			} else if lastId != shortest && done[lastId] {
+				lastId = shortest
+			}
+		}else {
+			lastId = shortest
 		}
 
 		if !check {
@@ -272,20 +291,16 @@ func SJFSchedule(w io.Writer, title string, processes []Process) {
 			totalWait += float64(waitingTimes[shortest])
 			gantt = append(gantt, TimeSlice{
 				PID:   processes[shortest].ProcessID,
-				Start: start,
+				Start: lastStart,
 				Stop:  int64(lastCompletion),
 			})
+			done[shortest] = true
+			lastId = shortest
+			lastStart = serviceTime + 1
 		}
 
 		serviceTime++
-		if lastId != shortest {
-			lastId = shortest
-			gantt = append(gantt, TimeSlice{
-				PID:   processes[shortest].ProcessID,
-				Start: start,
-				Stop:  serviceTime,
-			})
-		}
+
 	}
 
 	for i := range processes {
